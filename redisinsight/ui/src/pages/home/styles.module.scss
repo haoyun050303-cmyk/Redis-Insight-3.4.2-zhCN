@@ -1,0 +1,22 @@
+.pageWrapper {
+  height: 100%;
+  overflow: hidden;
+}
+
+.page {
+  height: 100%;
+  padding: 1px 16px 16px !important;
+
+  :global {
+    .homePage {
+      height: calc(100% - 60px);
+      overflow-y: auto;
+      /* Inset on all sides so table card chrome is not clipped by this scrollport */
+      padding: 1px;
+    }
+  }
+}
+
+.explorePanel {
+  padding-bottom: 16px;
+}
