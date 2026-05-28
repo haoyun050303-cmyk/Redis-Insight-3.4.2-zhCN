@@ -1,0 +1,126 @@
+import React from 'react'
+
+import {
+  CellContext,
+  ColumnDef,
+  Row as TableRow,
+} from 'uiSrc/components/base/layout/table'
+import { VectorSetSimilarityMatch } from 'uiSrc/slices/interfaces/vectorSet'
+
+import { ElementNameCell } from '../vector-set-element-list/components/ElementNameCell/ElementNameCell'
+import { formatSimilarity } from './utils'
+import { parseAttributes, renderAttributeValue } from './utils/parseAttributes'
+import {
+  HIGH_SIMILARITY_THRESHOLD,
+  SIMILARITY_RESULTS_ATTRIBUTE_COLUMN_ID_PREFIX,
+  SIMILARITY_RESULTS_ATTRIBUTE_COLUMN_SIZE,
+  SIMILARITY_RESULTS_COLUMN_HEADERS,
+  SIMILARITY_RESULTS_NAME_COLUMN_MIN_SIZE,
+  SIMILARITY_RESULTS_SIMILARITY_COLUMN_SIZE,
+} from './constants'
+import {
+  SimilarityResultsCellMeta,
+  SimilarityResultsColumn,
+  SimilarityResultsListConfig,
+} from './SimilaritySearchResultsTable.types'
+import * as S from './SimilaritySearchResultsTable.styles'
+import { KeyValueFormat } from 'uiSrc/constants'
+
+const nameColumn: ColumnDef<VectorSetSimilarityMatch> = {
+  id: SimilarityResultsColumn.Name,
+  accessorKey: SimilarityResultsColumn.Name,
+  header: SIMILARITY_RESULTS_COLUMN_HEADERS[SimilarityResultsColumn.Name],
+  enableSorting: false,
+  minSize: SIMILARITY_RESULTS_NAME_COLUMN_MIN_SIZE,
+  size: SIMILARITY_RESULTS_NAME_COLUMN_MIN_SIZE,
+  sizeUnit: 'px',
+  getHeaderCellProps: () => ({
+    style: {
+      width: 'auto',
+      minWidth: `${SIMILARITY_RESULTS_NAME_COLUMN_MIN_SIZE}px`,
+    },
+  }),
+  cell: ({ row, table }: CellContext<VectorSetSimilarityMatch, unknown>) => {
+    const { compressor = null, viewFormat } = table.options
+      .meta as SimilarityResultsListConfig
+    return (
+      <ElementNameCell
+        element={row.original}
+        compressor={compressor}
+        viewFormat={viewFormat ?? KeyValueFormat.JSON}
+      />
+    )
+  },
+}
+
+const similarityColumn: ColumnDef<VectorSetSimilarityMatch> = {
+  id: SimilarityResultsColumn.Similarity,
+  accessorKey: SimilarityResultsColumn.Similarity,
+  header: SIMILARITY_RESULTS_COLUMN_HEADERS[SimilarityResultsColumn.Similarity],
+  enableSorting: false,
+  size: SIMILARITY_RESULTS_SIMILARITY_COLUMN_SIZE,
+  minSize: SIMILARITY_RESULTS_SIMILARITY_COLUMN_SIZE,
+  maxSize: SIMILARITY_RESULTS_SIMILARITY_COLUMN_SIZE,
+  sizeUnit: 'px',
+  enableResizing: false,
+  cell: ({ row }: { row: TableRow<VectorSetSimilarityMatch> }) => {
+    const { score } = row.original
+    const isHigh = Number.isFinite(score) && score >= HIGH_SIMILARITY_THRESHOLD
+    return (
+      <S.SimilarityCell
+        $isHigh={isHigh}
+        data-testid={`vector-set-similarity-cell-${row.index}`}
+      >
+        {formatSimilarity(score)}
+      </S.SimilarityCell>
+    )
+  },
+}
+
+/**
+ * Build a column for a single attribute key. The cell reads the
+ * pre-parsed payload from `meta.parsedAttributesCache` so each row pays the
+ * JSON-parse cost once instead of once per attribute column it renders.
+ */
+const buildAttributeColumn = (
+  key: string,
+): ColumnDef<VectorSetSimilarityMatch> => ({
+  id: `${SIMILARITY_RESULTS_ATTRIBUTE_COLUMN_ID_PREFIX}${key}`,
+  header: key,
+  enableSorting: false,
+  size: SIMILARITY_RESULTS_ATTRIBUTE_COLUMN_SIZE,
+  sizeUnit: 'px',
+  cell: ({ row, table }: CellContext<VectorSetSimilarityMatch, unknown>) => {
+    const { parsedAttributesCache } = table.options
+      .meta as SimilarityResultsCellMeta
+    const attrs =
+      parsedAttributesCache.get(row.original) ??
+      parseAttributes(row.original.attributes)
+    const hasOwn = Object.prototype.hasOwnProperty.call(attrs, key)
+    const value = hasOwn ? attrs[key] : undefined
+    const isMissing = !hasOwn || value === null || value === undefined
+    return (
+      <S.AttributeCell
+        data-testid={`vector-set-similarity-attribute-cell-${row.index}-${key}`}
+      >
+        {isMissing ? (
+          <S.NilAttributeValue variant="italic">Empty</S.NilAttributeValue>
+        ) : (
+          renderAttributeValue(value)
+        )}
+      </S.AttributeCell>
+    )
+  },
+})
+
+/**
+ * Element + Similarity (sticky-left), followed by one column per attribute
+ * key. `attributeKeys` is expected to be in stable alphabetical order.
+ */
+export const buildSimilarityResultsColumns = (
+  attributeKeys: string[],
+): ColumnDef<VectorSetSimilarityMatch>[] => [
+  nameColumn,
+  similarityColumn,
+  ...attributeKeys.map(buildAttributeColumn),
+]

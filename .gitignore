@@ -1,0 +1,108 @@
+# compiled output
+dist
+node_modules
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+
+# Tests
+/coverage
+/.nyc_output
+**/coverage
+
+#CI
+.actrc
+my.secrets
+my.inputs
+
+# IDEs and editors
+/.idea
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.css.d.ts
+*.sass.d.ts
+*.scss.d.ts
+**/*.scss.d.ts
+
+# App packaged
+release
+main.prod.js
+main.prod.js.map
+redisinsight/ui/main.prod.js
+redisinsight/ui/main.prod.js.map
+renderer.prod.js
+renderer.prod.js.map
+redisinsight/ui/style.css
+redisinsight/ui/style.css.map
+redisinsight/ui/dist
+redisinsight/api/commands
+redisinsight/api/guides
+redisinsight/api/report
+redisinsight/api/reports
+redisinsight/api/dist-minified
+redisinsight/api/tutorials
+redisinsight/api/content
+
+# Generated OpenAPI artifacts (regenerated on install via `yarn generate:api-client`).
+# Both the spec dump and the TS client are derived from BE source — they are not committed.
+redisinsight/api/openapi.json
+redisinsight/api-client
+redisinsight/ui/dist-stats.html
+report
+reports
+distWeb
+dll
+main.js
+main.js.map
+vendor
+redisinsight/main.js.LICENSE.txt
+redisinsight/main.prod.js.LICENSE.txt
+licenses
+redisinsight/ui/src/packages/common/index*
+
+
+# E2E tests report
+/tests/e2e/report
+/tests/e2e/results
+/tests/e2e/remote
+/tests/e2e/.redisinsight-v2
+/tests/e2e/.redisinsight-app
+/tests/e2e/.redisinsight-insight
+
+# Parcel
+.parcel-cache
+
+# caches
+.temp_cache
+
+static/
+
+.env*
+.npmrc
+
+# AI rules
+.windsurfrules
+.junie/
+*storybook.log
+storybook-static
+
+# MCP Environment Configuration (contains secrets)
+.env.mcp
+
+.eslintcache
+
+# TypeScript incremental build info
+*.tsbuildinfo

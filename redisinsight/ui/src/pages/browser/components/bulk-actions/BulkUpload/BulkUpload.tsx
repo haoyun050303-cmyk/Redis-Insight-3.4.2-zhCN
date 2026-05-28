@@ -1,0 +1,240 @@
+import React, { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+
+import { Nullable } from 'uiSrc/utils'
+import { BulkActionsStatus, BulkActionsType } from 'uiSrc/constants'
+import { connectedInstanceSelector } from 'uiSrc/slices/instances/instances'
+import {
+  bulkActionsUploadOverviewSelector,
+  bulkActionsUploadSelector,
+  bulkActionsUploadSummarySelector,
+  bulkUploadDataAction,
+  setBulkUploadStartAgain,
+  uploadController,
+} from 'uiSrc/slices/browser/bulkActions'
+
+import BulkActionsInfo from 'uiSrc/pages/browser/components/bulk-actions/BulkActionsInfo'
+import BulkActionSummary from 'uiSrc/pages/browser/components/bulk-actions/BulkActionSummary'
+
+import { sendEventTelemetry, TelemetryEvent } from 'uiSrc/telemetry'
+import { isProcessedBulkAction } from 'uiSrc/pages/browser/components/bulk-actions/utils'
+import {
+  RiFilePicker,
+  UploadWarning,
+  RiPopover,
+  RiTooltip,
+} from 'uiSrc/components'
+import {
+  PrimaryButton,
+  SecondaryButton,
+} from 'uiSrc/components/base/forms/buttons'
+import { RefreshIcon } from 'uiSrc/components/base/icons'
+import { ColorText, Text } from 'uiSrc/components/base/text'
+import { RiIcon } from 'uiSrc/components/base/icons/RiIcon'
+import { Col, Row } from 'uiSrc/components/base/layout/flex'
+import { BROWSER_LABELS } from '../../../browser.labels'
+import {
+  StyledContent,
+  StyledFooter,
+  StyledPopoverContainer,
+  StyledPopoverIcon,
+  StyledPopoverText,
+} from './BulkUpload.styles'
+
+export interface Props {
+  onCancel: () => void
+}
+
+const MAX_MB_FILE = 3_000
+const MAX_FILE_SIZE = MAX_MB_FILE * 1024 * 1024
+
+const BulkUpload = (props: Props) => {
+  const { onCancel } = props
+  const { id: instanceId } = useSelector(connectedInstanceSelector)
+  const { loading, fileName } = useSelector(bulkActionsUploadSelector)
+  const { status, progress, duration } =
+    useSelector(bulkActionsUploadOverviewSelector) ?? {}
+  const { succeed, processed, failed } =
+    useSelector(bulkActionsUploadSummarySelector) ?? {}
+
+  const [files, setFiles] = useState<Nullable<FileList>>(null)
+  const [isInvalid, setIsInvalid] = useState<boolean>(false)
+  const [isSubmitDisabled, setIsSubmitDisabled] = useState<boolean>(true)
+  const [isPopoverOpen, setIsPopoverOpen] = useState<boolean>(false)
+
+  const isCompleted = status && status === BulkActionsStatus.Completed
+
+  const dispatch = useDispatch()
+
+  const onStartAgain = () => {
+    dispatch(setBulkUploadStartAgain())
+    setFiles(null)
+    setIsSubmitDisabled(true)
+  }
+
+  const handleUploadWarning = () => {
+    setIsPopoverOpen(true)
+    sendEventTelemetry({
+      event: TelemetryEvent.BULK_ACTIONS_WARNING,
+      eventData: {
+        databaseId: instanceId,
+        action: BulkActionsType.Upload,
+      },
+    })
+  }
+
+  const onFileChange = (files: Nullable<FileList>) => {
+    const isOutOfSize = (files?.[0]?.size || 0) > MAX_FILE_SIZE
+
+    setFiles(files)
+    setIsInvalid(!!files?.length && isOutOfSize)
+    setIsSubmitDisabled(!files?.length || isOutOfSize)
+  }
+
+  const handleUpload = () => {
+    if (files) {
+      setIsPopoverOpen(false)
+
+      const formData = new FormData()
+      formData.append('file', files[0])
+      dispatch(
+        bulkUploadDataAction(instanceId, {
+          file: formData,
+          fileName: files[0].name,
+        }),
+      )
+    }
+  }
+
+  const handleClickCancel = () => {
+    uploadController?.abort()
+    onCancel?.()
+  }
+
+  return (
+    <Col justify="between" data-testid="bulk-upload-container">
+      {!isCompleted ? (
+        <StyledContent gap="l" align="start">
+          <Row align="start" grow={false}>
+            <Text color="primary">
+              {BROWSER_LABELS.bulk.uploadFileDescription}
+            </Text>
+            <RiTooltip
+              content={
+                <>
+                  <Text size="xs">SET Key0 Value0</Text>
+                  <Text size="xs">SET Key1 Value1</Text>
+                  <Text size="xs">...</Text>
+                  <Text size="xs">SET KeyN ValueN</Text>
+                </>
+              }
+              data-testid="bulk-upload-tooltip-example"
+            >
+              <RiIcon
+                type="InfoIcon"
+                style={{
+                  marginLeft: 4,
+                  marginBottom: 2,
+                }}
+              />
+            </RiTooltip>
+          </Row>
+          <RiFilePicker
+            id="bulk-upload-file-input"
+            initialPromptText={BROWSER_LABELS.bulk.selectOrDropFile}
+            isInvalid={isInvalid}
+            onChange={onFileChange}
+            display="large"
+            data-testid="bulk-upload-file-input"
+            aria-label={BROWSER_LABELS.bulk.selectOrDropFileAria}
+          />
+          {isInvalid && (
+            <ColorText color="danger" data-testid="input-file-error-msg">
+              {BROWSER_LABELS.bulk.fileTooLargePrefix} {MAX_MB_FILE} MB
+            </ColorText>
+          )}
+          <UploadWarning />
+        </StyledContent>
+      ) : (
+        <BulkActionsInfo
+          loading={loading}
+          status={status}
+          progress={progress}
+          title={BROWSER_LABELS.bulk.commandsExecutedFromFile}
+          subTitle={<div className="truncateText">{fileName}</div>}
+        >
+          <BulkActionSummary
+            type={BulkActionsType.Upload}
+            succeed={succeed}
+            processed={processed}
+            failed={failed}
+            duration={duration}
+            data-testid="bulk-upload-completed-summary"
+          />
+        </BulkActionsInfo>
+      )}
+
+      <StyledFooter gap="l" justify="end" grow={false}>
+        <SecondaryButton
+          onClick={handleClickCancel}
+          data-testid="bulk-action-cancel-btn"
+        >
+          {isProcessedBulkAction(status)
+            ? BROWSER_LABELS.close
+            : BROWSER_LABELS.bulk.cancel}
+        </SecondaryButton>
+        {!isCompleted ? (
+          <RiPopover
+            id="bulk-upload-warning-popover"
+            anchorPosition="upCenter"
+            isOpen={isPopoverOpen}
+            closePopover={() => setIsPopoverOpen(false)}
+            panelPaddingSize="none"
+            button={
+              <PrimaryButton
+                onClick={handleUploadWarning}
+                disabled={isSubmitDisabled || loading}
+                loading={loading}
+                data-testid="bulk-action-warning-btn"
+              >
+                {BROWSER_LABELS.bulk.upload}
+              </PrimaryButton>
+            }
+          >
+            <StyledPopoverContainer gap="m">
+              <Col data-testid="bulk-action-tooltip" gap="s">
+                <StyledPopoverIcon type="ToastDangerIcon" />
+                <StyledPopoverText size="L" color="primary">
+                  {BROWSER_LABELS.bulk.confirmActionTitle}
+                </StyledPopoverText>
+                <StyledPopoverText size="M" color="secondary">
+                  {BROWSER_LABELS.bulk.uploadConfirmMessage}
+                </StyledPopoverText>
+              </Col>
+              <Row justify="end">
+                <PrimaryButton
+                  size="s"
+                  onClick={handleUpload}
+                  data-testid="bulk-action-apply-btn"
+                >
+                  {BROWSER_LABELS.bulk.upload}
+                </PrimaryButton>
+              </Row>
+            </StyledPopoverContainer>
+          </RiPopover>
+        ) : (
+          <PrimaryButton
+            icon={RefreshIcon}
+            color="secondary"
+            onClick={onStartAgain}
+            data-testid="bulk-action-start-new-btn"
+          >
+            {BROWSER_LABELS.bulk.startNew}
+          </PrimaryButton>
+        )}
+      </StyledFooter>
+    </Col>
+  )
+}
+
+export default BulkUpload
